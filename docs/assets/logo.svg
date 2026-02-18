@@ -1,0 +1,30 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">DblpService Logo</title>
+  <desc id="desc">Purple background logo with white database cylinder and service links.</desc>
+
+  <rect x="6" y="6" width="116" height="116" rx="26" fill="#711a5f" stroke="#9f3e8c" stroke-width="3" />
+
+  <g stroke="#ffffff" stroke-width="3.5" fill="none" stroke-linecap="round" opacity="0.92">
+    <path d="M24 38 L48 28" />
+    <path d="M24 90 L48 100" />
+    <path d="M104 38 L80 28" />
+    <path d="M104 90 L80 100" />
+  </g>
+
+  <g fill="#711a5f" stroke="#ffffff" stroke-width="2.8">
+    <circle cx="24" cy="38" r="4.8" />
+    <circle cx="24" cy="90" r="4.8" />
+    <circle cx="104" cy="38" r="4.8" />
+    <circle cx="104" cy="90" r="4.8" />
+  </g>
+
+  <ellipse cx="64" cy="42" rx="20" ry="8" fill="none" stroke="#ffffff" stroke-width="3" />
+  <rect x="44" y="42" width="40" height="44" fill="none" stroke="#ffffff" stroke-width="3" />
+  <ellipse cx="64" cy="86" rx="20" ry="8" fill="none" stroke="#ffffff" stroke-width="3" />
+
+  <g stroke="#ffffff" stroke-width="2.3" opacity="0.58">
+    <path d="M44 54 H84" />
+    <path d="M44 66 H84" />
+    <path d="M44 78 H84" />
+  </g>
+</svg>

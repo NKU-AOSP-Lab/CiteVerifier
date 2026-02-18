@@ -1,0 +1,80 @@
+﻿.grid-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.grid-form label {
+  display: grid;
+  gap: 5px;
+  color: var(--ink-soft);
+}
+
+.checkbox-line {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkbox-line input {
+  width: 16px;
+  height: 16px;
+}
+
+.btn-row {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+button.warn {
+  background: linear-gradient(145deg, #c8943a 0%, #a17424 100%);
+  border-color: #9b6f21;
+}
+
+button.ghost {
+  color: var(--ink);
+  background: #edf2f8;
+  border-color: var(--line);
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.kv span {
+  color: var(--ink-soft);
+}
+
+pre {
+  margin: 0;
+  max-height: 340px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--control-radius);
+  background: color-mix(in srgb, var(--card-bg) 85%, white 15%);
+  padding: 10px;
+  font-size: 0.87rem;
+  line-height: 1.45;
+}
+
+table code {
+  word-break: break-all;
+  color: var(--accent-2);
+}
+
+@media (max-width: 900px) {
+  .grid-form {
+    grid-template-columns: 1fr;
+  }
+
+  .kv {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+}
