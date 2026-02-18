@@ -1,11 +1,11 @@
 ﻿site_name: CiteVerifier Wiki
 site_description: CiteVerifier CLI and Web documentation
-site_url: https://citeverifier.readthedocs.io/
+site_url: !ENV [READTHEDOCS_CANONICAL_URL, "https://citeverifier.readthedocs.io/en/latest/"]
 repo_name: CiteVerifier
 
 theme:
   name: material
-  logo: assets/logo.svg
+  logo: image/logo.svg
   palette:
     - scheme: default
       primary: custom

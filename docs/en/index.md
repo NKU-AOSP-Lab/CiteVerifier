@@ -1,5 +1,5 @@
 ﻿<p align="center">
-  <img src="../assets/logo.svg" alt="CiteVerifier Logo" width="56" style="vertical-align:middle;" />
+  <img src="/en/latest/image/logo.svg" alt="CiteVerifier Logo" width="56" style="vertical-align:middle;" />
   <span style="font-size:1.8rem;font-weight:700;vertical-align:middle;margin-left:8px;">CiteVerifier Documentation</span>
 </p>
 
@@ -41,5 +41,7 @@ CiteVerifier is a DBLP-first citation/title verification project with CLI and We
 - Engineers deploying DBLP-only lookup/verification services
 - Researchers running batch verification pipelines
 - Maintainers analyzing cache hit rates and runtime telemetry
+
+
 
 

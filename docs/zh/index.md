@@ -1,5 +1,5 @@
 ﻿<p align="center">
-  <img src="../assets/logo.svg" alt="CiteVerifier Logo" width="56" style="vertical-align:middle;" />
+  <img src="/en/latest/image/logo.svg" alt="CiteVerifier Logo" width="56" style="vertical-align:middle;" />
   <span style="font-size:1.8rem;font-weight:700;vertical-align:middle;margin-left:8px;">CiteVerifier 文档</span>
 </p>
 
@@ -41,3 +41,5 @@ CiteVerifier 是一个以 DBLP 为优先的数据核验项目，提供 CLI 与 W
 - 需要部署 DBLP 本地核验服务的工程师
 - 运行批量引用核验流程的研究人员
 - 关注缓存命中率与运行时指标的维护者
+
+
