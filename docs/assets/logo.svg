@@ -1,0 +1,26 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">CiteVerifier Logo</title>
+  <desc id="desc">Purple background logo with white document and verification checkmark.</desc>
+
+  <rect x="6" y="6" width="116" height="116" rx="26" fill="#711a5f" stroke="#9f3e8c" stroke-width="3" />
+
+  <rect x="28" y="24" width="72" height="80" rx="10" fill="none" stroke="#ffffff" stroke-width="3" />
+
+  <g stroke="#ffffff" stroke-width="4" stroke-linecap="round" opacity="0.62">
+    <path d="M40 43 H88" />
+    <path d="M40 55 H88" />
+    <path d="M40 67 H70" />
+    <path d="M40 79 H66" />
+  </g>
+
+  <g fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M56 73 L64 81 L82 62" />
+  </g>
+
+  <g fill="#711a5f" stroke="#ffffff" stroke-width="2.4" opacity="0.95">
+    <circle cx="28" cy="24" r="4" />
+    <circle cx="100" cy="24" r="4" />
+    <circle cx="28" cy="104" r="4" />
+    <circle cx="100" cy="104" r="4" />
+  </g>
+</svg>

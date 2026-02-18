@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-from math import log
 import time
 import json
 import argparse
@@ -10,20 +9,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Union
 from dataclasses import dataclass
-from enum import Enum
 import sys
 import os
 import sqlite3
 import pandas as pd
 from tqdm import tqdm
-from grobid_client.grobid_client import GrobidClient
 
 # Add project root directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from parser.llm_parser import llm_str2ref
 from checker.models import Reference, ExternalReference, convert_parsed_reference, convert_parsed_references, VerificationResult, VerificationStatus
-from checker.clients.scrapingdog_client import ScrapingDogClient
-from checker.clients.google_search_client import GoogleSearchClient
 from checker.utils import StringUtils, AuthorUtils
 from unified_database import (
     UnifiedDatabase, 
@@ -491,6 +485,12 @@ class LLMReparser:
             return None
         
         try:
+            try:
+                from parser.llm_parser import llm_str2ref
+            except Exception as exc:
+                logger.warning("LLM parser unavailable, skip LLM reparse: %s", exc)
+                return None
+
             logger.info(f"Reparse reference using LLM {ref_id}: {raw_text[:50]}...")
             
             # Use async semaphore to limit concurrency
@@ -576,7 +576,7 @@ class VerificationChain:
             diagnosis="All verification methods failed to verify reference",
             problematic_fields=[],
             best_match=last_external_ref,  # Use last external_ref
-            sources_checked=sources_attempted or ["scrapingdog"],
+            sources_checked=sources_attempted or ["dblp"],
             total_time=time.time() - start_time,
             verification_notes=verification_notes,
             recommendations=["Check if reference information is correct, may need manual verification"]
@@ -586,17 +586,18 @@ class VerificationChain:
 
 
 class ScrapingDogVerifier:
-    """ScrapingDog batch verifier"""
+    """Reference verifier with DBLP-first strategy (online APIs optional)."""
     
     def __init__(
         self,
         db_path: str = "scholar_results.db",
         max_concurrent: int = 3,
         parsed_refs_db_path: str = "parsed_references.db",
-        dblp_db_path: Optional[str] = "dblp_titles.db",
+        dblp_db_path: Optional[str] = "dblp.sqlite",
         dblp_match_threshold: float = 0.9,
         dblp_max_candidates: int = 100000,
         enable_dblp: bool = True,
+        enable_online: bool = False,
     ):
         """
         Initialize verifier
@@ -608,8 +609,8 @@ class ScrapingDogVerifier:
         """
         self.db = UnifiedDatabase(db_path)
         self.max_concurrent = max_concurrent
-        self.client: Optional[ScrapingDogClient] = None
-        self.google_client: Optional[GoogleSearchClient] = None
+        self.client: Optional[Any] = None
+        self.google_client: Optional[Any] = None
         self.stats = VerificationStats()
         
         # Initialize components
@@ -624,6 +625,7 @@ class ScrapingDogVerifier:
         self.dblp_match_threshold = dblp_match_threshold
         self.dblp_max_candidates = dblp_max_candidates
         self.enable_dblp = enable_dblp
+        self.enable_online = enable_online
         self.dblp_strategy: Optional[DblpVerificationStrategy] = None
         
         # Build verification strategy chain
@@ -643,22 +645,36 @@ class ScrapingDogVerifier:
             )
             strategies.append(self.dblp_strategy)
 
-        strategies.extend([
-            CacheVerificationStrategy(self.db, self.validator),
-            APIVerificationStrategy(self.validator, self.storage_service),
-            GoogleFallbackStrategy(self.validator, self.storage_service),
-            LLMReparseStrategy(self.validator, self.llm_reparser, self.storage_service),
-        ])
+        strategies.append(CacheVerificationStrategy(self.db, self.validator))
+        if self.enable_online:
+            strategies.extend([
+                APIVerificationStrategy(self.validator, self.storage_service),
+                GoogleFallbackStrategy(self.validator, self.storage_service),
+                LLMReparseStrategy(self.validator, self.llm_reparser, self.storage_service),
+            ])
 
         self.verification_chain = VerificationChain(strategies)
     
     async def __aenter__(self):
         """Async context manager entry"""
-        self.client = ScrapingDogClient()
-        await self.client.initialize()
-        
-        self.google_client = GoogleSearchClient()
-        await self.google_client.initialize()
+        if self.enable_online:
+            try:
+                from checker.clients.scrapingdog_client import ScrapingDogClient
+                from checker.clients.google_search_client import GoogleSearchClient
+            except Exception as exc:
+                logger.warning(
+                    "Online verification clients unavailable; falling back to DBLP/cache only: %s",
+                    exc,
+                )
+                self.enable_online = False
+                self._build_verification_chain()
+                return self
+
+            self.client = ScrapingDogClient()
+            await self.client.initialize()
+
+            self.google_client = GoogleSearchClient()
+            await self.google_client.initialize()
         return self
     
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -927,9 +943,9 @@ async def start_verify(verifier: ScrapingDogVerifier, references: List[Reference
     else:
         csv_output = args.output.replace('.json', '.csv')
     
-    dir_main = '/'.join(args.dir.split('/')[:-1])+'/validation_results/'+args.dir.split('/')[-1]
-    print(dir_main)
     if args.dir:
+        dir_main = '/'.join(args.dir.split('/')[:-1]) + '/validation_results/' + args.dir.split('/')[-1]
+        print(dir_main)
         if not os.path.exists(dir_main):
             os.makedirs(dir_main)
         csv_output = os.path.join(dir_main, csv_output)
@@ -962,12 +978,41 @@ def create_sample_references() -> List[Reference]:
     return convert_parsed_references(sample_data)
 
 
+def search_single_title_in_dblp(
+    title: str,
+    dblp_db_path: str,
+    max_candidates: int = 100000,
+) -> Optional[Dict[str, Any]]:
+    """Search a single paper title in local DBLP sqlite."""
+    db_path = Path(dblp_db_path)
+    if not db_path.exists():
+        raise FileNotFoundError(f"DBLP database not found: {db_path}")
+
+    from dblp_match import _db_has_word_index, _sqlite_readonly_fast, load_all_titles_from_db
+    from dblp_match import search_dblp_by_index, search_dblp_brute_force
+
+    conn = sqlite3.connect(str(db_path))
+    try:
+        if _db_has_word_index(conn):
+            _sqlite_readonly_fast(conn)
+            return search_dblp_by_index(conn, title, max_candidates=max_candidates)
+    finally:
+        conn.close()
+
+    # Fallback: no index, brute-force in memory.
+    all_titles = load_all_titles_from_db(db_path)
+    return search_dblp_brute_force(all_titles, title)
+
+
 async def main():
     """Main function"""
-    parser = argparse.ArgumentParser(description="ScrapingDog batch search program")
+    parser = argparse.ArgumentParser(
+        description="Reference verification tool (DBLP-only mode by default; online APIs optional)."
+    )
     parser.add_argument("--dir", "-d", type=str, help="Input directory path", default=None)
     parser.add_argument("--input", "-i", type=str, help="Input JSON file path")
     parser.add_argument("--inllm", "-l", type=str, help="Input LLM JSON file path")
+    parser.add_argument("--title", type=str, help="Search a single paper title in local DBLP sqlite")
     parser.add_argument("--output", "-o", type=str, default="scholar_results.json", help="Output JSON file path")
     parser.add_argument("--database", "-db", type=str, default="scholar_results.db", help="Database file path")
     parser.add_argument("--concurrent", "-c", type=int, default=10, help="Maximum concurrency")
@@ -976,10 +1021,15 @@ async def main():
     parser.add_argument("--clear-db", action="store_true", help="Clear database")
     parser.add_argument("--cleanup-duplicates", action="store_true", help="Clean up duplicate data (keep earliest record)")
     parser.add_argument("--year-filter", type=int, help="Filter export by year")
-    parser.add_argument("--dblp-db", type=str, default="dblp_titles.db", help="DBLP SQLite database path")
+    parser.add_argument("--dblp-db", type=str, default="dblp.sqlite", help="DBLP SQLite database path (DblpService schema)")
     parser.add_argument("--dblp-threshold", type=float, default=0.9, help="DBLP title match threshold (ratio)")
     parser.add_argument("--dblp-max-candidates", type=int, default=100000, help="Max DBLP candidates per query")
     parser.add_argument("--disable-dblp", action="store_true", help="Skip DBLP pre-match step")
+    parser.add_argument(
+        "--enable-online",
+        action="store_true",
+        help="Enable ScrapingDog/Google/LLM strategies (default is DBLP/cache-only).",
+    )
     
     args = parser.parse_args()
     
@@ -991,6 +1041,7 @@ async def main():
         dblp_match_threshold=args.dblp_threshold,
         dblp_max_candidates=args.dblp_max_candidates,
         enable_dblp=not args.disable_dblp,
+        enable_online=args.enable_online,
     )
     file_processor = FileProcessor(verifier)
     
@@ -1013,6 +1064,20 @@ async def main():
             return
         
         
+        if args.title:
+            print(f"Searching DBLP by title: {args.title}")
+            match = search_single_title_in_dblp(
+                title=args.title,
+                dblp_db_path=args.dblp_db,
+                max_candidates=args.dblp_max_candidates,
+            )
+            if not match:
+                print("No DBLP match found.")
+                return
+            print("DBLP match found:")
+            print(json.dumps(match, ensure_ascii=False, indent=2))
+            return
+
         # Load references
         if args.sample:
             print("Using sample reference data")

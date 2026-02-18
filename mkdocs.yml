@@ -1,0 +1,65 @@
+﻿site_name: CiteVerifier Wiki
+site_description: CiteVerifier CLI and Web documentation
+site_url: https://citeverifier.readthedocs.io/
+repo_name: CiteVerifier
+
+theme:
+  name: material
+  logo: assets/logo.svg
+  palette:
+    - scheme: default
+      primary: custom
+      accent: custom
+
+extra_css:
+  - stylesheets/extra.css
+
+plugins:
+  - search
+  - i18n:
+      docs_structure: folder
+      fallback_to_default: true
+      reconfigure_material: true
+      reconfigure_search: true
+      languages:
+        - locale: en
+          default: true
+          name: English
+          build: true
+          nav:
+            - Home: index.md
+            - Quick Start: quickstart.md
+            - Configuration: configuration.md
+            - API Reference: api.md
+            - Development Guide: develop.md
+            - Operations: operations.md
+            - Troubleshooting: troubleshooting.md
+            - Changelog: changelog.md
+        - locale: zh
+          name: 中文
+          build: true
+          nav:
+            - 首页: index.md
+            - 快速开始: quickstart.md
+            - 配置说明: configuration.md
+            - 接口说明: api.md
+            - 开发文档: develop.md
+            - 运维手册: operations.md
+            - 故障排查: troubleshooting.md
+            - 变更记录: changelog.md
+  - redirects:
+      redirect_maps:
+        en/index.md: en/index.md
+        en/quickstart.md: en/quickstart.md
+        en/configuration.md: en/configuration.md
+        en/api.md: en/api.md
+        en/develop.md: en/develop.md
+        en/operations.md: en/operations.md
+        en/troubleshooting.md: en/troubleshooting.md
+        en/changelog.md: en/changelog.md
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true

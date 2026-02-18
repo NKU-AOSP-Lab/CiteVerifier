@@ -116,126 +116,15 @@ def build_dblp_db(
     batch_size: int = 50000,
 ) -> None:
     """
-    Stream-parse dblp.xml and store titles into SQLite database.
-    Only stores: id, title, title_norm (normalized for search).
+    Deprecated.
+
+    DB building is no longer provided by CiteVerifier. Use the DblpService backend to build
+    `dblp.sqlite` in fullmeta mode, then point `verifier.py --dblp-db` to that database.
     """
-    print(f"[build_dblp_db] dblp_xml = {dblp_xml}")
-    print(f"[build_dblp_db] db_path = {db_path}")
-
-    # Create/overwrite database
-    if db_path.exists():
-        db_path.unlink()
-    
-    conn = sqlite3.connect(str(db_path))
-    cur = conn.cursor()
-    
-    cur.execute("""
-        CREATE TABLE titles (
-            id INTEGER PRIMARY KEY,
-            title TEXT NOT NULL,
-            title_norm TEXT NOT NULL
-        )
-    """)
-    cur.execute("""
-        CREATE TABLE title_words (
-            word TEXT NOT NULL,
-            id INTEGER NOT NULL,
-            PRIMARY KEY (word, id)
-        )
-    """)
-    conn.commit()
-
-    def get_text(elem: Any, tag: str) -> Optional[str]:
-        child = elem.find(tag)
-        if child is not None and child.text:
-            return child.text.strip()
-        return None
-
-    total_file_size = dblp_xml.stat().st_size
-    # Use file path directly so lxml reads in its own chunks (no custom reader = no hang).
-    # Ensure dblp.dtd is in the same directory as dblp.xml for entity resolution.
-    xml_path = str(dblp_xml.resolve())
-    context = etree.iterparse(
-        xml_path,
-        events=("end",),
-        recover=True,
-        load_dtd=True,
-        resolve_entities=True,
-        no_network=False,
+    raise RuntimeError(
+        "Building DBLP databases from CiteVerifier is disabled. "
+        "Use DblpService to build dblp.sqlite, then pass --dblp-db to verifier.py."
     )
-    
-    total = 0
-    batch: List[Tuple[int, str, str]] = []
-    start_time = time.perf_counter()
-
-    print("[build_dblp_db] Parsing XML and building database...")
-    print(f"[build_dblp_db] File size: {total_file_size / (1024**3):.2f} GB")
-    print("[build_dblp_db] Using direct file read (dblp.dtd must be next to dblp.xml for entities).")
-    print("[build_dblp_db] Progress every 50k records:", flush=True)
-
-    try:
-        for _, elem in context:
-            if elem.tag in {"article", "inproceedings", "incollection", "book", "proceedings"}:
-                title = get_text(elem, "title")
-                if not title:
-                    elem.clear()
-                    continue
-
-                title_norm = normalize_title(title)
-                batch.append((total, title, title_norm))
-                total += 1
-
-                if len(batch) >= batch_size:
-                    cur.executemany("INSERT INTO titles VALUES (?, ?, ?)", batch)
-                    word_batch: List[Tuple[str, int]] = []
-                    for tid, _, norm in batch:
-                        for w in norm.split():
-                            if len(w) >= 2:
-                                word_batch.append((w, tid))
-                    if word_batch:
-                        cur.executemany("INSERT OR IGNORE INTO title_words VALUES (?, ?)", word_batch)
-                    conn.commit()
-                    batch.clear()
-                    
-                    elapsed = time.perf_counter() - start_time
-                    rate = total / elapsed if elapsed > 0 else 0
-                    print(f"[build_dblp_db] {total} records | {elapsed/60:.1f} min | ~{rate:.0f} rec/s", flush=True)
-
-                elem.clear()
-                while elem.getprevious() is not None:
-                    del elem.getparent()[0]
-                    
-    except etree.XMLSyntaxError as e:
-        print(f"[build_dblp_db] XML parse error (using partial results): {e}")
-    except Exception as e:
-        print(f"[build_dblp_db] Unexpected error (using partial results): {e}")
-    finally:
-        # Insert remaining batch
-        if batch:
-            cur.executemany("INSERT INTO titles VALUES (?, ?, ?)", batch)
-            word_batch = []
-            for tid, _, norm in batch:
-                for w in norm.split():
-                    if len(w) >= 2:
-                        word_batch.append((w, tid))
-            if word_batch:
-                cur.executemany("INSERT OR IGNORE INTO title_words VALUES (?, ?)", word_batch)
-            conn.commit()
-        
-        # Create indexes for faster queries
-        print("[build_dblp_db] Creating indexes...")
-        cur.execute("CREATE INDEX idx_title_norm ON titles(title_norm)")
-        cur.execute("CREATE INDEX idx_title_words_word ON title_words(word)")
-        cur.execute("CREATE INDEX idx_title_words_id ON title_words(id)")
-        conn.commit()
-        
-        try:
-            del context
-        except Exception:
-            pass
-
-    conn.close()
-    print(f"[build_dblp_db] Done. {total} titles stored in {db_path}")
 
 
 def _sqlite_readonly_fast(conn: sqlite3.Connection) -> None:
@@ -246,6 +135,78 @@ def _sqlite_readonly_fast(conn: sqlite3.Connection) -> None:
     conn.execute("PRAGMA temp_store = MEMORY")
 
 
+def _db_has_title_fts(conn: sqlite3.Connection) -> bool:
+    cur = conn.cursor()
+    cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='title_fts'")
+    return cur.fetchone() is not None
+
+
+def _fts_query_from_norm(title_norm: str, max_terms: int = 5) -> str:
+    # Keep only alnum tokens to avoid FTS query syntax pitfalls.
+    # (isalnum keeps Unicode letters/digits; we still rely on DB tokenizer for actual matching.)
+    cleaned = "".join((ch.lower() if ch.isalnum() else " ") for ch in title_norm)
+    tokens = cleaned.split()
+    seen = set()
+    uniq: List[str] = []
+    for t in tokens:
+        if len(t) < 2:
+            continue
+        if t in seen:
+            continue
+        seen.add(t)
+        uniq.append(t)
+        if len(uniq) >= max_terms:
+            break
+    return " ".join(uniq)
+
+
+def _search_dblp_by_title_fts(
+    conn: sqlite3.Connection,
+    orig_title: str,
+    max_candidates: int,
+) -> Optional[Dict[str, Any]]:
+    title_norm = normalize_title(orig_title)
+    query = _fts_query_from_norm(title_norm)
+    if not query:
+        return None
+
+    limit = int(max_candidates)
+    # Defensive cap: very broad queries can be expensive.
+    if limit <= 0:
+        limit = 200
+    limit = min(limit, 10000)
+
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT rowid, title FROM title_fts WHERE title_fts MATCH ? LIMIT ?;",
+        (query, limit),
+    )
+    rows = cur.fetchall()
+    if not rows:
+        return None
+
+    best_id = None
+    best_title = None
+    best_score = -1.0
+
+    for rid, title in rows:
+        cand_norm = normalize_title(title)
+        score = fuzz.token_sort_ratio(title_norm, cand_norm) / 100.0
+        if score > best_score:
+            best_score = score
+            best_id = rid
+            best_title = title
+
+    if best_id is None or best_title is None:
+        return None
+
+    return {
+        "dblp_id": int(best_id),
+        "dblp_title": str(best_title),
+        "dblp_title_similarity": float(best_score),
+    }
+
+
 def search_dblp_by_index(
     conn: sqlite3.Connection,
     orig_title: Any,
@@ -254,6 +215,9 @@ def search_dblp_by_index(
     """Fuzzy match by normalized title using ratio (edit-distance based)."""
     if not isinstance(orig_title, str) or not orig_title.strip():
         return None
+
+    if _db_has_title_fts(conn):
+        return _search_dblp_by_title_fts(conn, orig_title, max_candidates=max_candidates)
 
     title_norm = normalize_title(orig_title)
     words = [w for w in title_norm.split() if len(w) >= 2]
@@ -310,6 +274,9 @@ def search_dblp_by_index(
 
 
 def _db_has_word_index(conn: sqlite3.Connection) -> bool:
+    # "Indexed" here means we can do candidate selection without loading all titles.
+    if _db_has_title_fts(conn):
+        return True
     cur = conn.cursor()
     cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='title_words'")
     return cur.fetchone() is not None
@@ -321,8 +288,20 @@ def load_all_titles_from_db(db_path: Path, quiet: bool = False) -> List[Tuple[in
         print(f"[load_all_titles_from_db] Loading from {db_path}...")
     conn = sqlite3.connect(str(db_path))
     cur = conn.cursor()
-    cur.execute("SELECT id, title, title_norm FROM titles")
-    rows = cur.fetchall()
+    cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='titles'")
+    has_titles = cur.fetchone() is not None
+    if has_titles:
+        cur.execute("SELECT id, title, title_norm FROM titles")
+        rows = cur.fetchall()
+    else:
+        cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='publications'")
+        has_pubs = cur.fetchone() is not None
+        if not has_pubs:
+            conn.close()
+            raise RuntimeError(f"Unsupported DB schema in {db_path}")
+        cur.execute("SELECT id, title FROM publications")
+        pub_rows = cur.fetchall()
+        rows = [(int(pid), str(title), normalize_title(title)) for (pid, title) in pub_rows]
     conn.close()
     if not quiet:
         print(f"[load_all_titles_from_db] Loaded {len(rows)} titles.")
@@ -486,7 +465,7 @@ def run_matching(
     if use_index:
         print("[run_matching] Using word index (low memory).")
     else:
-        print("[run_matching] No title_words index. Using full-DB load (high memory). Rebuild with --build-db.")
+        print("[run_matching] No index found. Falling back to full-DB load (high memory).")
         workers = 1
 
     if workers <= 0:
@@ -579,27 +558,15 @@ def run_matching(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Build DBLP title database from dblp.xml, or match CSV rows against it."
+            "Match CSV rows against a local DBLP sqlite database (dblp.sqlite). "
+            "Build the database via DblpService."
         )
-    )
-    
-    # Database building options
-    parser.add_argument(
-        "--build-db",
-        action="store_true",
-        help="Build SQLite database from dblp.xml (run this first).",
-    )
-    parser.add_argument(
-        "--dblp-xml",
-        type=Path,
-        default=Path("dblp.xml"),
-        help="Path to dblp.xml (default: ./dblp.xml)",
     )
     parser.add_argument(
         "--db",
         type=Path,
-        default=Path("dblp_titles.db"),
-        help="Path to SQLite database (default: ./dblp_titles.db)",
+        default=Path("dblp.sqlite"),
+        help="Path to SQLite database (default: ./dblp.sqlite)",
     )
     
     # Matching options
@@ -659,7 +626,7 @@ def parse_args() -> argparse.Namespace:
         "--max-candidates",
         type=int,
         default=5000,
-        help="Max candidate titles per query when using word index (default: 100000).",
+        help="Max candidate titles per query (default: 5000).",
     )
     return parser.parse_args()
 
@@ -667,29 +634,24 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    if args.build_db:
-        # Build database mode
-        build_dblp_db(args.dblp_xml, args.db)
-    else:
-        # Matching mode
-        if not args.db.exists():
-            print(f"[ERROR] Database not found: {args.db}")
-            print("Run with --build-db first to create the database.")
-            return
-        
-        run_matching(
-            v2_csv=args.v2_csv,
-            out_csv=args.out_csv,
-            db_path=args.db,
-            dblp_match_threshold=args.dblp_match_threshold,
-            match_all=args.match_all,
-            title_sim_threshold=args.title_sim_threshold,
-            sim_column=args.sim_column,
-            workers=args.workers,
-            max_candidates=args.max_candidates,
-            checkpoint_interval=args.checkpoint_interval,
-            resume=args.resume,
-        )
+    if not args.db.exists():
+        print(f"[ERROR] Database not found: {args.db}")
+        print("Build dblp.sqlite via DblpService, then re-run with --db.")
+        return
+
+    run_matching(
+        v2_csv=args.v2_csv,
+        out_csv=args.out_csv,
+        db_path=args.db,
+        dblp_match_threshold=args.dblp_match_threshold,
+        match_all=args.match_all,
+        title_sim_threshold=args.title_sim_threshold,
+        sim_column=args.sim_column,
+        workers=args.workers,
+        max_candidates=args.max_candidates,
+        checkpoint_interval=args.checkpoint_interval,
+        resume=args.resume,
+    )
 
 
 if __name__ == "__main__":

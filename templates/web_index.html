@@ -1,0 +1,183 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title data-i18n="page_title">CiteVerifier DBLP Search</title>
+    <link rel="stylesheet" href="/static/web_styles.css" />
+    <link rel="stylesheet" href="/static/material_theme.css" />
+  </head>
+  <body>
+    <header class="top-titlebar">
+      <div class="brand-block">
+        <img class="brand-logo" src="/static/citeverifier-logo.svg" alt="CiteVerifier Logo" />
+        <div class="brand-copy">
+          <strong class="brand-name">CiteVerifier</strong>
+          <p data-i18n="brand_tagline">Search and batch-verify paper titles against local DBLP data</p>
+        </div>
+      </div>
+      <span class="brand-chip" data-i18n="brand_chip">由AOSP实验室维护</span>
+    </header>
+
+    <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">&#9776;</button>
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <div class="app-layout">
+      <aside class="sidebar" id="sidebar">
+        <section class="sidebar-section">
+          <h3 data-i18n="control_language">Language</h3>
+          <div class="style-control">
+            <label for="language-select" data-i18n="control_language">Language</label>
+            <select id="language-select">
+              <option value="en" data-i18n="lang_en">English</option>
+              <option value="zh" data-i18n="lang_zh">Chinese</option>
+            </select>
+          </div>
+        </section>
+
+        <section class="sidebar-section">
+          <h3 data-i18n="status_title">System Status</h3>
+          <div class="status-row">
+            <span class="label" data-i18n="status_service">Service</span>
+            <span id="health-status" class="chip chip-warn" data-i18n="status_checking">Checking</span>
+          </div>
+        </section>
+
+        <section class="sidebar-section">
+          <h3 data-i18n="settings_title">Lookup Settings</h3>
+          <label class="field">
+            <span data-i18n="settings_max_candidates">Max Candidates</span>
+            <input id="max-candidates" type="number" min="1" value="100000" />
+          </label>
+        </section>
+
+        <section class="sidebar-section">
+          <h3 data-i18n="footer_title">Project Information</h3>
+          <div class="meta-grid">
+            <div class="meta-row">
+              <span data-i18n="footer_owner_label">Developer & Maintainer</span>
+              <strong data-i18n="footer_owner_value">Nankai University AOSP Laboratory</strong>
+            </div>
+            <div class="meta-row">
+              <span data-i18n="footer_members_label">Members</span>
+              <strong data-i18n="footer_members_value">Xiang Li, Zuyao Xu, Yuqi Qiu, Fubin Wu, Fasheng Miao, Lu Sun</strong>
+            </div>
+            <div class="meta-row">
+              <span data-i18n="footer_version_label">Version</span>
+              <strong>v{{ app_version }}</strong>
+            </div>
+            <div class="meta-row">
+              <span data-i18n="footer_features_label">Current Features</span>
+              <strong data-i18n="footer_features_value">Single-title lookup, batch verification, CSV export, and runtime telemetry.</strong>
+            </div>
+            <div class="meta-row">
+              <span data-i18n="footer_license_label">License</span>
+              <strong>MIT</strong>
+            </div>
+            <div class="meta-row">
+              <span data-i18n="footer_visits_label">Visits</span>
+              <strong>{{ visit_count }}</strong>
+            </div>
+            <div class="meta-row">
+              <span data-i18n="footer_copyright_label">Copyright</span>
+              <strong data-i18n="footer_copyright_value">&copy; 2026 AOSP Lab of Nankai University. All Rights Reserved.</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="sidebar-section">
+          <div class="lab-promo">
+            <div class="lab-promo-info">
+              <h3 data-i18n="lab_name">AOSP Laboratory, Nankai University</h3>
+              <p class="lab-slogan" data-i18n="lab_slogan">All-in-One Security and Privacy Lab</p>
+              <p data-i18n="lab_description">The lab focuses on diversified security and privacy research, spanning network security, Web security, LLM security, and emerging security risks. It is dedicated to enhancing overall security in scenarios where network technologies converge with large models, and continuously supports the security community through original research contributions.</p>
+              <p data-i18n-html="lab_advisor_intro">Advisor: <a href="https://lixiang521.com/" target="_blank" rel="noopener">Xiang Li</a>.</p>
+            </div>
+            <div class="lab-promo-qrcode">
+              <img src="/static/aosp-qrcode.jpg" alt="AOSP Lab QR Code" />
+              <span data-i18n="lab_qrcode_caption">Follow AOSP Lab</span>
+            </div>
+          </div>
+        </section>
+      </aside>
+
+      <main class="content">
+        <header class="page-header">
+          <h1 data-i18n="hero_title">CiteVerifier DBLP Title Search</h1>
+          <p data-i18n="hero_subtitle">Input a paper title and search from local DBLP SQLite only.</p>
+        </header>
+
+        <section class="card">
+          <h2 data-i18n="search_title">Search</h2>
+          <form id="search-form" class="search-form">
+            <label class="field">
+              <span data-i18n="search_input_label">Paper Title</span>
+              <textarea
+                id="title-input"
+                rows="4"
+                data-i18n-placeholder="search_input_placeholder"
+                placeholder="Attention Is All You Need"
+                required
+              ></textarea>
+            </label>
+            <div class="btn-row">
+              <button type="submit" id="search-btn" data-i18n="search_button">Search</button>
+            </div>
+          </form>
+          <p id="search-msg" class="msg"></p>
+        </section>
+
+        <section class="card">
+          <h2 data-i18n="batch_title">Batch Search</h2>
+          <form id="batch-form" class="search-form">
+            <label class="field">
+              <span data-i18n="batch_input_label">Titles (one per line)</span>
+              <textarea
+                id="batch-input"
+                rows="8"
+                data-i18n-placeholder="batch_input_placeholder"
+                placeholder="Attention Is All You Need&#10;BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding"
+              ></textarea>
+            </label>
+            <label class="field">
+              <span data-i18n="batch_file_label">Upload TXT/CSV (first column used)</span>
+              <input id="batch-file" type="file" accept=".txt,.csv,text/plain,text/csv" />
+            </label>
+            <div class="btn-row">
+              <button type="submit" id="batch-run-btn" data-i18n="batch_run_button">Run Batch</button>
+              <button type="button" id="batch-download-btn" class="btn-secondary" disabled data-i18n="batch_download_button">
+                Download CSV
+              </button>
+            </div>
+          </form>
+          <p id="batch-msg" class="msg"></p>
+          <div id="batch-summary" class="result-box empty" data-i18n="batch_no_result">No batch result yet.</div>
+          <div class="table-wrap">
+            <table id="batch-table">
+              <thead>
+                <tr>
+                  <th data-i18n="table_index">#</th>
+                  <th data-i18n="table_query_title">Query Title</th>
+                  <th data-i18n="table_status">Status</th>
+                  <th data-i18n="table_matched_title">Matched Title</th>
+                  <th data-i18n="table_similarity">Similarity</th>
+                  <th data-i18n="table_year">Year</th>
+                  <th data-i18n="table_venue">Venue</th>
+                </tr>
+              </thead>
+              <tbody id="batch-tbody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2 data-i18n="result_title">Result</h2>
+          <div id="result-box" class="result-box empty" data-i18n="result_empty">No result yet.</div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/static/web_app.js"></script>
+  </body>
+</html>
+

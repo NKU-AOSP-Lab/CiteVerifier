@@ -1,0 +1,63 @@
+﻿:root {
+  --body-bg: #f5f5f5;
+  --sidebar-bg: #ffffff;
+  --ink: #1f1f1f;
+  --ink-soft: #5f5f5f;
+  --line: #e3e3e3;
+  --card-bg: #ffffff;
+  --accent: #2f2f2f;
+  --ok: #146d40;
+  --warn: #8a6400;
+  --error: #9d3232;
+}
+
+body {
+  background: radial-gradient(circle at top right, #ffffff 0%, var(--body-bg) 40%);
+}
+
+.sidebar {
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.04);
+}
+
+.card {
+  border-radius: 12px;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06);
+}
+
+input,
+textarea {
+  border-radius: 10px;
+  border-color: var(--line);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+input:focus,
+textarea:focus {
+  outline: 2px solid rgba(0, 0, 0, 0.1);
+  border-color: #2f2f2f;
+}
+
+button {
+  border-radius: 10px;
+  border-color: #2a2a2a;
+  background: #2f2f2f;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  transition: filter 0.12s ease, transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+button:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.24);
+}
+
+.btn-secondary {
+  color: #2f2f2f;
+  background: #f3f3f3;
+  border-color: #d2d2d2;
+}
+
+thead th {
+  background: #f1f1f1;
+  color: #2f2f2f;
+}

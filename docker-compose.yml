@@ -1,0 +1,35 @@
+services:
+  dblp-service:
+    build:
+      context: ./DblpService
+      dockerfile: Dockerfile
+    container_name: citeverifier-dblp-service
+    ports:
+      - "${DBLP_PORT:-8093}:8091"
+    environment:
+      DATA_DIR: "/data"
+      CORS_ORIGINS: "${CORS_ORIGINS:-http://localhost:8092}"
+    volumes:
+      - dblp_data:/data
+    restart: unless-stopped
+
+  citeverifier-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: citeverifier-web
+    ports:
+      - "${WEB_PORT:-8092}:8092"
+    environment:
+      DBLP_DB_PATH: "/data/dblp.sqlite"
+      CITEVERIFIER_DATA_DIR: "/runtime"
+    volumes:
+      - dblp_data:/data
+      - citeverifier_runtime:/runtime
+    depends_on:
+      - dblp-service
+    restart: unless-stopped
+
+volumes:
+  dblp_data:
+  citeverifier_runtime:
