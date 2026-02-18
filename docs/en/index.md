@@ -1,13 +1,7 @@
-<p align="center">
+﻿<p align="center">
   <img src="../assets/logo.svg" alt="CiteVerifier Logo" width="56" style="vertical-align:middle;" />
   <span style="font-size:1.8rem;font-weight:700;vertical-align:middle;margin-left:8px;">CiteVerifier Documentation</span>
 </p>
-
-![Version](https://img.shields.io/badge/version-0.1.0-1f7a8c)
-![Python](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.111%2B-009688?logo=fastapi&logoColor=white)
-
-Language: **English** (default) | [Chinese](../zh/)
 
 CiteVerifier is a DBLP-first citation/title verification project with CLI and Web interfaces.
 
