@@ -1,0 +1,197 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title data-i18n="page_title_bootstrap">DblpService Bootstrap Console</title>
+    <link rel="stylesheet" href="/static/query_styles.css" />
+    <link rel="stylesheet" href="/static/bootstrap_styles.css" />
+    <link rel="stylesheet" href="/static/material_theme.css" />
+  </head>
+  <body data-style="hotcrp" data-page="bootstrap">
+    <header class="top-titlebar">
+      <div class="brand-block">
+        <img class="brand-logo" src="/static/dblpservice-logo.svg" alt="DblpService Logo" />
+        <div class="brand-copy">
+          <strong class="brand-name">DblpService</strong>
+          <p data-i18n="brand_tagline">Build and maintain DBLP SQLite, and provide unified query APIs for CoAuthors and CiteVerifier</p>
+        </div>
+      </div>
+      <span class="brand-chip" data-i18n="brand_chip">由AOSP实验室维护</span>
+    </header>
+
+    <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">&#9776;</button>
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <div class="app-layout">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-section">
+          <h3 data-i18n="control_language">Language</h3>
+          <div class="style-control">
+            <label for="language-select" data-i18n="control_language">Language</label>
+            <select id="language-select">
+              <option value="en" data-i18n="lang_en">English</option>
+              <option value="zh" data-i18n="lang_zh">Chinese</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <h3 data-i18n="bootstrap_runtime">Runtime Status</h3>
+          <div class="status-row">
+            <span class="label" data-i18n="runtime_status">Status</span>
+            <span id="status" class="chip chip-warn">idle</span>
+          </div>
+          <div class="status-row">
+            <span class="label" data-i18n="runtime_step">Step</span>
+            <span id="step">idle</span>
+          </div>
+          <div class="status-row">
+            <span class="label" data-i18n="progress_data_dir">Data Dir</span>
+            <span id="data-dir">{{ data_dir }}</span>
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <h3 data-i18n="footer_title">Project Information</h3>
+          <div class="meta-grid">
+            <div class="meta-row">
+              <span data-i18n="footer_owner_label">Developer & Maintainer</span>
+              <strong data-i18n="footer_owner_value">Nankai University AOSP Laboratory</strong>
+            </div>
+            <div class="meta-row">
+              <span data-i18n="footer_members_label">Members</span>
+              <strong data-i18n="footer_members_value">Xiang Li, Zuyao Xu, Yuqi Qiu, Fubin Wu, Fasheng Miao, Lu Sun</strong>
+            </div>
+            <div class="meta-row">
+              <span data-i18n="footer_version_label">Version</span>
+              <strong>v{{ app_version }}</strong>
+            </div>
+            <div class="meta-row">
+              <span data-i18n="footer_features_label">Current Features</span>
+              <strong data-i18n="footer_features_value">DBLP download, decompression, database rebuild, and runtime status monitoring.</strong>
+            </div>
+            <div class="meta-row">
+              <span data-i18n="footer_license_label">License</span>
+              <strong>MIT</strong>
+            </div>
+            <div class="meta-row">
+              <span data-i18n="footer_visits_label">Visits</span>
+              <strong>{{ visit_count }}</strong>
+            </div>
+            <div class="meta-row">
+              <span data-i18n="footer_copyright_label">Copyright</span>
+              <strong data-i18n="footer_copyright_value">&copy; 2026 AOSP Lab of Nankai University. All Rights Reserved.</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <div class="lab-promo">
+            <div class="lab-promo-info">
+              <h3 data-i18n="lab_name">AOSP Laboratory, Nankai University</h3>
+              <p class="lab-slogan" data-i18n="lab_slogan">All-in-One Security and Privacy Lab</p>
+              <p data-i18n="lab_description">The lab focuses on diversified security and privacy research, spanning network security, Web security, LLM security, and emerging security risks. It is dedicated to enhancing overall security in scenarios where network technologies converge with large models, and continuously supports the security community through original research contributions.</p>
+              <p data-i18n-html="lab_advisor_intro">Advisor: <a href="https://lixiang521.com/" target="_blank" rel="noopener">Xiang Li</a>.</p>
+            </div>
+            <div class="lab-promo-qrcode">
+              <img src="/static/aosp-qrcode.jpg" alt="AOSP Lab QR Code" />
+              <span data-i18n="lab_qrcode_caption">Follow AOSP Lab</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="content">
+        <div class="page-header">
+          <h1 data-i18n="bootstrap_title">DblpService Bootstrap Console</h1>
+          <p data-i18n="bootstrap_subtitle">
+            Download XML/DTD, decompress XML, and build DBLP SQLite through the web.
+          </p>
+        </div>
+
+        <section class="content-section">
+          <h2 data-i18n="bootstrap_params_title">Task Parameters</h2>
+          <form id="start-form" class="grid-form">
+            <label>
+              <span data-i18n="bootstrap_xml_url">XML.GZ URL</span>
+              <input id="xml-gz-url" type="url" value="{{ default_xml_gz_url }}" required />
+            </label>
+
+            <label>
+              <span data-i18n="bootstrap_dtd_url">DTD URL</span>
+              <input id="dtd-url" type="url" value="{{ default_dtd_url }}" required />
+            </label>
+
+            <label>
+              <span data-i18n="bootstrap_batch">Batch Size</span>
+              <input id="batch-size" type="number" min="100" value="{{ default_batch_size }}" />
+            </label>
+
+            <label>
+              <span data-i18n="bootstrap_progress_every">Progress Every</span>
+              <input id="progress-every" type="number" min="1000" value="{{ default_progress_every }}" />
+            </label>
+
+            <label class="checkbox-line">
+              <input id="rebuild" type="checkbox" checked />
+              <span data-i18n="bootstrap_rebuild">Rebuild database (remove existing sqlite/wal/shm)</span>
+            </label>
+
+            <div class="btn-row">
+              <button type="submit" id="start-btn" data-i18n="bootstrap_start">Start</button>
+              <button type="button" id="stop-btn" class="warn" data-i18n="bootstrap_stop">Stop</button>
+              <button type="button" id="reset-btn" class="ghost" data-i18n="bootstrap_reset">Reset</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="content-section status-grid">
+          <article class="card">
+            <h2 data-i18n="bootstrap_runtime">Runtime Status</h2>
+            <div class="kv"><span data-i18n="runtime_message">Message</span><strong id="message">-</strong></div>
+            <div class="kv"><span data-i18n="runtime_started">Started</span><strong id="started-at">-</strong></div>
+            <div class="kv"><span data-i18n="runtime_finished">Finished</span><strong id="finished-at">-</strong></div>
+          </article>
+
+          <article class="card">
+            <h2 data-i18n="bootstrap_progress">Progress</h2>
+            <div class="kv"><span data-i18n="progress_downloaded">Downloaded</span><strong id="downloaded-bytes">-</strong></div>
+            <div class="kv"><span data-i18n="progress_total">Total</span><strong id="total-bytes">-</strong></div>
+            <div class="kv"><span data-i18n="progress_xml_written">XML Written</span><strong id="written-bytes">-</strong></div>
+            <div class="kv"><span data-i18n="progress_records">Processed Records</span><strong id="processed-records">-</strong></div>
+            <div class="kv"><span data-i18n="progress_rate">Rate</span><strong id="records-rate">-</strong></div>
+          </article>
+        </section>
+
+        <section class="content-section">
+          <h2 data-i18n="bootstrap_output_files">Output Files</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th data-i18n="table_file">File</th>
+                  <th data-i18n="table_exists">Exists</th>
+                  <th data-i18n="table_size">Size</th>
+                  <th data-i18n="table_path">Path</th>
+                </tr>
+              </thead>
+              <tbody id="file-table"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="content-section">
+          <h2 data-i18n="bootstrap_logs">Live Logs</h2>
+          <pre id="logs"></pre>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      window.__API_BASE__ = "{{ api_base }}";
+    </script>
+    <script src="/static/bootstrap_app.js"></script>
+  </body>
+</html>
+
